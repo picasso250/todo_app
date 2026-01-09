@@ -1,0 +1,25 @@
+{
+  "name": "todo_app",
+  "version": "1.0.0",
+  "description": "一个极简风格的专注时间管理应用，采用赛博朋克美学设计。",
+  "main": "main.js",
+  "dependencies": {
+    "svelte": "^5.46.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.3",
+    "vite": "^7.3.1"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/picasso250/todo_app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

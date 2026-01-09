@@ -1,264 +1,53 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>心流驾驶舱 - Flow Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="script.js"></script>
-    <link rel="stylesheet" href="styles.css">
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'cyber-black': '#0a0a0a',
-                        'cyber-dark': '#1a1a1a',
-                        'cyber-gray': '#2a2a2a',
-                        'neon-cyan': '#00ffff',
-                        'neon-pink': '#ff1493',
-                        'neon-purple': '#9945ff',
-                        'cyber-blue': '#0066ff',
-                        'cyber-green': '#00ff41'
-                    },
-                    boxShadow: {
-                        'neon-cyan': '0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #00ffff',
-                        'neon-pink': '0 0 20px #ff1493, 0 0 40px #ff1493, 0 0 60px #ff1493',
-                        'neon-purple': '0 0 20px #9945ff, 0 0 40px #9945ff, 0 0 60px #9945ff'
-                    },
-                    animation: {
-                        'pulse-glow': 'pulse-glow 2s infinite',
-                        'float': 'float 3s ease-in-out infinite'
-                    },
-                    keyframes: {
-                        'pulse-glow': {
-                            '0%, 100%': { opacity: '1' },
-                            '50%': { opacity: '0.8' }
-                        },
-                        'float': {
-                            '0%, 100%': { transform: 'translateY(0px)' },
-                            '50%': { transform: 'translateY(-10px)' }
-                        }
-                    }
-                }
-            }
-        }
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "cyber-black": "#0a0a0a",
+              "cyber-dark": "#1a1a1a",
+              "cyber-gray": "#2a2a2a",
+              "neon-cyan": "#00ffff",
+              "neon-pink": "#ff1493",
+              "neon-purple": "#9945ff",
+              "cyber-blue": "#0066ff",
+              "cyber-green": "#00ff41",
+            },
+            boxShadow: {
+              "neon-cyan":
+                "0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #00ffff",
+              "neon-pink":
+                "0 0 20px #ff1493, 0 0 40px #ff1493, 0 0 60px #ff1493",
+              "neon-purple":
+                "0 0 20px #9945ff, 0 0 40px #9945ff, 0 0 60px #9945ff",
+            },
+            animation: {
+              "pulse-glow": "pulse-glow 2s infinite",
+              float: "float 3s ease-in-out infinite",
+            },
+            keyframes: {
+              "pulse-glow": {
+                "0%, 100%": { opacity: "1" },
+                "50%": { opacity: "0.8" },
+              },
+              float: {
+                "0%, 100%": { transform: "translateY(0px)" },
+                "50%": { transform: "translateY(-10px)" },
+              },
+            },
+          },
+        },
+      };
     </script>
-</head>
-<body class="min-h-screen bg-cyber-black text-gray-100 overflow-hidden" x-data="flowDashboard()">
-    
-    <!-- 网格背景 -->
-    <div class="fixed inset-0 bg-grid-pattern opacity-20 pointer-events-none"></div>
-    
-    <!-- 上帝视角统计面板 -->
-    <div class="fixed top-4 right-4 z-50 god-view-panel rounded-lg p-4 min-w-[200px]">
-        <h3 class="cyber-font text-sm font-semibold text-neon-purple mb-3 god-view-stat">今日专注</h3>
-        <div class="flex items-center justify-center mb-3">
-            <svg width="120" height="120" class="transform -rotate-90">
-                <circle cx="60" cy="60" r="50" stroke="#2a2a2a" stroke-width="8" fill="none"/>
-                <circle cx="60" cy="60" r="50" stroke="#9945ff" stroke-width="8" fill="none"
-                        :stroke-dasharray="314.16"
-                        :stroke-dashoffset="314.16 - (314.16 * todayFocusPercentage / 100)"
-                        class="god-view-ring"
-                        stroke-linecap="round"/>
-            </svg>
-            <div class="absolute text-center">
-                <div class="cyber-font text-xl text-neon-purple god-view-stat" x-text="todayFocusMinutes + 'min'">0min</div>
-                <div class="text-xs text-gray-500">专注时长</div>
-            </div>
-        </div>
-        <div class="text-xs text-gray-400 text-center">
-            效率指数: <span class="text-neon-cyan font-semibold god-view-stat" x-text="todayFocusPercentage + '%'">0%</span>
-        </div>
-    </div>
-        </div>
-        <div class="text-xs text-gray-400 text-center">
-            效率指数: <span class="text-neon-cyan font-semibold" x-text="todayFocusPercentage + '%'">0%</span>
-        </div>
-    </div>
-    
-    <!-- 主容器 -->
-    <div class="flex h-screen relative z-10">
-        
-        <!-- 左侧看板区域 -->
-        <aside class="w-96 bg-cyber-dark/90 backdrop-blur-md border-r border-cyber-gray p-6 overflow-y-auto">
-            
-            <!-- 标题 -->
-            <header class="mb-8">
-                <h1 class="cyber-font text-2xl font-bold text-neon-cyan neon-text mb-2">心流驾驶舱</h1>
-                <p class="text-gray-400 text-sm">专注当下，掌控时间</p>
-            </header>
-            
-            <!-- 添加任务按钮 -->
-            <button @click="showAddTask = true" class="w-full cyber-border p-3 rounded-lg text-neon-cyan hover:bg-neon-cyan/10 transition-all duration-300 font-medium mb-6">
-                + 添加新任务
-            </button>
-            
-            <!-- 添加任务弹窗 -->
-            <div x-show="showAddTask" x-transition class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" style="display: none;">
-                <div class="bg-cyber-dark p-6 rounded-lg border border-neon-cyan w-96">
-                    <h3 class="cyber-font text-lg text-neon-cyan mb-4">添加新任务</h3>
-                    <input x-model="newTaskTitle" placeholder="任务名称" class="w-full bg-cyber-gray border border-gray-700 rounded px-3 py-2 text-gray-200 mb-3">
-                    <input x-model="newTaskDuration" type="number" placeholder="时长（分钟）" class="w-full bg-cyber-gray border border-gray-700 rounded px-3 py-2 text-gray-200 mb-4">
-                    <div class="flex space-x-3">
-                        <button @click="addTask()" class="flex-1 bg-neon-cyan text-cyber-black px-4 py-2 rounded font-medium">添加</button>
-                        <button @click="showAddTask = false; newTaskTitle = ''; newTaskDuration = ''" class="flex-1 bg-gray-700 text-gray-200 px-4 py-2 rounded font-medium">取消</button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 看板容器 -->
-            <div class="space-y-6">
-                
-                <!-- TODO 列表 -->
-                <section class="cyber-border rounded-lg p-4">
-                    <h2 class="cyber-font text-sm font-semibold text-neon-cyan mb-4 flex items-center justify-between">
-                        <span class="flex items-center">
-                            <span class="w-2 h-2 bg-neon-cyan rounded-full mr-2 animate-pulse"></span>
-                            TODO 待办
-                        </span>
-                        <span class="text-xs text-gray-500" x-text="todoTasks.length + ' 个任务'"></span>
-                    </h2>
-                    <div class="space-y-2">
-                        <template x-for="task in todoTasks" :key="task.id">
-                            <div class="task-card bg-cyber-gray/50 p-3 rounded border border-gray-700 hover:border-neon-cyan/50">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex-1">
-                                        <h3 class="text-sm font-medium text-gray-200" x-text="task.title"></h3>
-                                        <p class="text-xs text-gray-500 mt-1" x-text="task.duration + ' 分钟'"></p>
-                                    </div>
-                                    <div class="flex space-x-2">
-                                        <button @click="startTask(task)" class="text-neon-cyan hover:text-neon-pink transition-colors" title="开始任务">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                            </svg>
-                                        </button>
-                                        <button @click="deleteTask(task.id, 'todo')" class="text-red-500 hover:text-red-400 transition-colors" title="删除任务">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </section>
-                
-                <!-- DOING 列表 -->
-                <section class="cyber-border rounded-lg p-4">
-                    <h2 class="cyber-font text-sm font-semibold text-neon-pink mb-4 flex items-center justify-between">
-                        <span class="flex items-center">
-                            <span class="w-2 h-2 bg-neon-pink rounded-full mr-2 animate-pulse"></span>
-                            DOING 进行中
-                        </span>
-                        <span class="text-xs text-gray-500" x-text="doingTasks.length + ' 个任务'"></span>
-                    </h2>
-                    <div class="space-y-2">
-                        <template x-for="task in doingTasks" :key="task.id">
-                            <div class="task-card bg-cyber-gray/50 p-3 rounded border border-neon-pink/50">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex-1">
-                                        <h3 class="text-sm font-medium text-gray-200" x-text="task.title"></h3>
-                                        <p class="text-xs text-gray-500 mt-1" x-text="task.duration + ' 分钟'"></p>
-                                    </div>
-                                    <div class="flex space-x-2">
-                                        <button @click="completeTask(task)" class="text-cyber-green hover:text-green-400 transition-colors" title="完成任务">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                            </svg>
-                                        </button>
-                                        <button @click="pauseTask(task)" class="text-orange-500 hover:text-orange-400 transition-colors" title="暂停任务">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </section>
-                
-                <!-- DONE 列表 -->
-                <section class="cyber-border rounded-lg p-4">
-                    <h2 class="cyber-font text-sm font-semibold text-cyber-green mb-4 flex items-center justify-between">
-                        <span class="flex items-center">
-                            <span class="w-2 h-2 bg-cyber-green rounded-full mr-2"></span>
-                            DONE 已完成
-                        </span>
-                        <span class="text-xs text-gray-500" x-text="doneTasks.length + ' 个任务'"></span>
-                    </h2>
-                    <div class="space-y-2">
-                        <template x-for="task in doneTasks" :key="task.id">
-                            <div class="task-card bg-cyber-gray/30 p-3 rounded border border-gray-700 opacity-60">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex-1">
-                                        <h3 class="text-sm font-medium text-gray-400 line-through" x-text="task.title"></h3>
-                                        <p class="text-xs text-gray-600 mt-1" x-text="'完成于 ' + task.completedAt"></p>
-                                    </div>
-                                    <div class="flex space-x-2">
-                                        <button @click="redoTask(task)" class="text-gray-400 hover:text-neon-cyan transition-colors" title="重新开始">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                            </svg>
-                                        </button>
-                                        <button @click="deleteTask(task.id, 'done')" class="text-red-500 hover:text-red-400 transition-colors" title="删除任务">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </section>
-                
-            </div>
-            
-        </aside>
-        
-        <!-- 中间倒计时区域 -->
-        <main class="flex-1 flex items-center justify-center relative">
-            
-            <!-- 倒计时显示 -->
-            <div class="text-center">
-                <div class="countdown-glow mb-8">
-                    <div class="cyber-font text-8xl font-bold text-neon-cyan neon-text" x-text="formatTime(remainingTime)">25:00</div>
-                </div>
-                
-                <div class="space-y-4">
-                    <h2 class="cyber-font text-2xl text-gray-300" x-text="currentTask ? currentTask.title : '准备开始'">准备开始</h2>
-                    
-                    <!-- 控制按钮 -->
-                    <div class="flex justify-center space-x-4">
-                        <button @click="startTimer()" :disabled="isRunning || !currentTask" 
-                                class="cyber-border px-8 py-3 rounded-lg text-neon-cyan hover:bg-neon-cyan hover:text-cyber-black transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span x-show="!isRunning">开始</span>
-                            <span x-show="isRunning">运行中</span>
-                        </button>
-                        <button @click="pauseTimer()" :disabled="!isRunning" 
-                                class="cyber-border px-8 py-3 rounded-lg text-neon-pink hover:bg-neon-pink hover:text-cyber-black transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                            暂停
-                        </button>
-                        <button @click="resetTimer()" 
-                                class="cyber-border px-8 py-3 rounded-lg text-gray-400 hover:bg-gray-400 hover:text-cyber-black transition-all duration-300 font-medium">
-                            重置
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 装饰性元素 -->
-            <div class="absolute top-10 right-10 w-32 h-32 border border-neon-cyan/20 rounded-full animate-pulse"></div>
-            <div class="absolute bottom-10 left-10 w-24 h-24 border border-neon-pink/20 rounded-full animate-pulse delay-100"></div>
-            
-        </main>
-        
-    </div>
-    
-</body>
+  </head>
+  <body class="min-h-screen bg-cyber-black text-gray-100 overflow-hidden">
+    <div id="app"></div>
+    <script type="module" src="./main.js"></script>
+  </body>
 </html>
