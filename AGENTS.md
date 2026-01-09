@@ -63,7 +63,7 @@
 ---
 
 如果我在大的改动之后忘记，那么你提醒我
-"Review logic. Remove redundant code. Simplify state management. Can we make xxx under 400 lines without splitting files?"
+"Review logic. Remove redundant code. Simplify state management. Refactor to reduce Cognitive Load"
 Removing whitespace and compressing CSS is NOT simplification. It makes the code unmaintainable.
     Rule: Readability > Line Count.
     Do not delete comments or necessary spacing.
