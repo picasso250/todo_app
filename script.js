@@ -11,6 +11,10 @@ function flowDashboard() {
         showAddTask: false,
         newTaskTitle: '',
         newTaskDuration: 25,
+        // 上帝视角统计
+        todayFocusMinutes: 0,
+        todayFocusPercentage: 0,
+        dailyTarget: 240, // 4小时目标（240分钟）
         
         // 初始化：从localStorage恢复数据
         init() {
@@ -40,6 +44,9 @@ function flowDashboard() {
                 ];
                 this.saveData();
             }
+            
+            // 计算今日专注时间
+            this.calculateTodayFocus();
         },
         
         // 保存数据到localStorage
@@ -53,6 +60,9 @@ function flowDashboard() {
                 timestamp: new Date().toISOString()
             };
             localStorage.setItem('flowDashboardData', JSON.stringify(data));
+            
+            // 重新计算今日专注时间
+            this.calculateTodayFocus();
         },
         
         // 添加新任务
@@ -148,6 +158,10 @@ function flowDashboard() {
             this.timer = setInterval(() => {
                 if (this.remainingTime > 0) {
                     this.remainingTime--;
+                    // 每分钟更新一次专注统计
+                    if (this.remainingTime % 60 === 0) {
+                        this.calculateTodayFocus();
+                    }
                     this.saveData();
                 } else {
                     // 时间到，自动完成任务
@@ -210,6 +224,28 @@ function flowDashboard() {
             
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.5);
+        },
+        
+        // 计算今日专注时间
+        calculateTodayFocus() {
+            const today = new Date().toDateString();
+            let totalMinutes = 0;
+            
+            // 统计已完成任务的专注时间
+            this.doneTasks.forEach(task => {
+                if (task.completedAt && new Date(task.completedAt).toDateString() === today) {
+                    totalMinutes += task.actualDuration ? Math.round(task.actualDuration / 60) : task.duration;
+                }
+            });
+            
+            // 统计正在进行的任务已用时长
+            if (this.currentTask && this.isRunning) {
+                const elapsedMinutes = Math.round((this.currentTask.duration * 60 - this.remainingTime) / 60);
+                totalMinutes += elapsedMinutes;
+            }
+            
+            this.todayFocusMinutes = totalMinutes;
+            this.todayFocusPercentage = Math.min(Math.round((totalMinutes / this.dailyTarget) * 100), 100);
         },
         
         // 页面卸载时清理

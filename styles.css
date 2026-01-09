@@ -31,3 +31,20 @@ body {
 .countdown-glow {
     filter: drop-shadow(0 0 30px #00ffff);
 }
+
+/* 上帝视角统计面板样式 */
+.god-view-panel {
+    backdrop-filter: blur(10px);
+    background: rgba(26, 26, 26, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 20px rgba(153, 69, 255, 0.2);
+}
+
+.god-view-ring {
+    transition: stroke-dashoffset 0.5s ease-in-out;
+}
+
+.god-view-stat {
+    font-family: 'Orbitron', monospace;
+    text-shadow: 0 0 10px rgba(153, 69, 255, 0.8);
+}

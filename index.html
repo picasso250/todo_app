@@ -51,6 +51,33 @@
     <!-- 网格背景 -->
     <div class="fixed inset-0 bg-grid-pattern opacity-20 pointer-events-none"></div>
     
+    <!-- 上帝视角统计面板 -->
+    <div class="fixed top-4 right-4 z-50 god-view-panel rounded-lg p-4 min-w-[200px]">
+        <h3 class="cyber-font text-sm font-semibold text-neon-purple mb-3 god-view-stat">今日专注</h3>
+        <div class="flex items-center justify-center mb-3">
+            <svg width="120" height="120" class="transform -rotate-90">
+                <circle cx="60" cy="60" r="50" stroke="#2a2a2a" stroke-width="8" fill="none"/>
+                <circle cx="60" cy="60" r="50" stroke="#9945ff" stroke-width="8" fill="none"
+                        :stroke-dasharray="314.16"
+                        :stroke-dashoffset="314.16 - (314.16 * todayFocusPercentage / 100)"
+                        class="god-view-ring"
+                        stroke-linecap="round"/>
+            </svg>
+            <div class="absolute text-center">
+                <div class="cyber-font text-xl text-neon-purple god-view-stat" x-text="todayFocusMinutes + 'min'">0min</div>
+                <div class="text-xs text-gray-500">专注时长</div>
+            </div>
+        </div>
+        <div class="text-xs text-gray-400 text-center">
+            效率指数: <span class="text-neon-cyan font-semibold god-view-stat" x-text="todayFocusPercentage + '%'">0%</span>
+        </div>
+    </div>
+        </div>
+        <div class="text-xs text-gray-400 text-center">
+            效率指数: <span class="text-neon-cyan font-semibold" x-text="todayFocusPercentage + '%'">0%</span>
+        </div>
+    </div>
+    
     <!-- 主容器 -->
     <div class="flex h-screen relative z-10">
         
