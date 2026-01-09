@@ -396,12 +396,22 @@
             bind:value={newTaskTitle}
             placeholder="任务名称"
             class="w-full bg-cyber-gray border border-gray-700 rounded px-3 py-2 text-gray-200 mb-3"
+            on:keydown={(e) => {
+              if (e.key === 'Enter') {
+                addTask()
+              }
+            }}
           />
           <input
             bind:value={newTaskDuration}
             type="number"
             placeholder="时长（分钟）"
             class="w-full bg-cyber-gray border border-gray-700 rounded px-3 py-2 text-gray-200 mb-4"
+            on:keydown={(e) => {
+              if (e.key === 'Enter') {
+                addTask()
+              }
+            }}
           />
           <div class="flex space-x-3">
             <button
