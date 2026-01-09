@@ -19,6 +19,7 @@
   const dailyTarget = 240
   
   let timer = null
+  let expandedPrompts = {}
   
   // 订阅响应式变量
   $: todoTasksArray = $todoTasks
@@ -45,17 +46,36 @@
     const savedData = localStorage.getItem('flowDashboardData')
     if (savedData) {
       const data = JSON.parse(savedData)
-      todoTasks.set(data.todoTasks || [])
-      doingTasks.set(data.doingTasks || [])
-      doneTasks.set(data.doneTasks || [])
-      currentTask.set(data.currentTask || null)
+      
+      // 兼容旧数据：为所有任务添加 prompt_context 字段
+      const migrateTasks = (tasks) => {
+        return tasks.map(task => ({
+          ...task,
+          prompt_context: task.prompt_context || ""
+        }))
+      }
+      
+      todoTasks.set(migrateTasks(data.todoTasks || []))
+      doingTasks.set(migrateTasks(data.doingTasks || []))
+      doneTasks.set(migrateTasks(data.doneTasks || []))
+      
+      // 兼容当前任务
+      if (data.currentTask) {
+        currentTask.set({
+          ...data.currentTask,
+          prompt_context: data.currentTask.prompt_context || ""
+        })
+      } else {
+        currentTask.set(null)
+      }
+      
       remainingTime.set(data.remainingTime || 25 * 60)
     } else {
       // 首次使用时的示例数据
       todoTasks.set([
-        { id: Date.now() + 1, title: '完成项目提案', duration: 25, createdAt: new Date().toLocaleString('zh-CN') },
-        { id: Date.now() + 2, title: '代码审查', duration: 30, createdAt: new Date().toLocaleString('zh-CN') },
-        { id: Date.now() + 3, title: '学习新技术', duration: 45, createdAt: new Date().toLocaleString('zh-CN') }
+        { id: Date.now() + 1, title: '完成项目提案', duration: 25, createdAt: new Date().toLocaleString('zh-CN'), prompt_context: "" },
+        { id: Date.now() + 2, title: '代码审查', duration: 30, createdAt: new Date().toLocaleString('zh-CN'), prompt_context: "" },
+        { id: Date.now() + 3, title: '学习新技术', duration: 45, createdAt: new Date().toLocaleString('zh-CN'), prompt_context: "" }
       ])
       saveData()
     }
@@ -84,7 +104,8 @@
       id: Date.now(),
       title: $newTaskTitle.trim(),
       duration: parseInt($newTaskDuration) || 25,
-      createdAt: new Date().toLocaleString('zh-CN')
+      createdAt: new Date().toLocaleString('zh-CN'),
+      prompt_context: ""
     }
     
     todoTasks.update(tasks => [...tasks, task])
@@ -132,7 +153,8 @@
       id: Date.now(),
       title: task.title,
       duration: task.duration,
-      createdAt: new Date().toLocaleString('zh-CN')
+      createdAt: new Date().toLocaleString('zh-CN'),
+      prompt_context: task.prompt_context || ""
     }
     
     doneTasks.update(tasks => tasks.filter(t => t.id !== task.id))
@@ -231,6 +253,46 @@
     oscillator.stop(audioContext.currentTime + 0.5)
   }
   
+  // 更新任务的 prompt_context
+  function updatePromptContext(taskId, type, promptContext) {
+    if (type === 'todo') {
+      todoTasks.update(tasks => tasks.map(t => 
+        t.id === taskId ? { ...t, prompt_context: promptContext } : t
+      ))
+    } else if (type === 'doing') {
+      doingTasks.update(tasks => tasks.map(t => 
+        t.id === taskId ? { ...t, prompt_context: promptContext } : t
+      ))
+    } else if (type === 'done') {
+      doneTasks.update(tasks => tasks.map(t => 
+        t.id === taskId ? { ...t, prompt_context: promptContext } : t
+      ))
+    }
+    
+    // 如果是当前任务，也要更新 currentTask
+    if ($currentTask && $currentTask.id === taskId) {
+      currentTask.update(task => ({ ...task, prompt_context: promptContext }))
+    }
+    
+    saveData()
+  }
+  
+  // 切换 Prompt 显示/隐藏
+  function togglePrompt(promptId) {
+    expandedPrompts[promptId] = !expandedPrompts[promptId]
+    expandedPrompts = {...expandedPrompts}
+  }
+  
+  // 复制到剪贴板
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text)
+      // 这里可以添加提示信息，但为了保持简洁，暂时不添加
+    } catch (err) {
+      console.error('复制失败:', err)
+    }
+  }
+  
   // 计算今日专注时间
   function calculateTodayFocus() {
     const today = new Date().toDateString()
@@ -325,6 +387,7 @@
                 </h2>
                 <div class="space-y-2">
                     {#each todoTasksArray as task (task.id)}
+                    {@const showPrompt = `prompt-${task.id}`}
                     <div class="task-card bg-cyber-gray/50 p-3 rounded border border-gray-700 hover:border-neon-cyan/50">
                         <div class="flex items-center justify-between">
                             <div class="flex-1">
@@ -338,6 +401,11 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
                                 </button>
+                                <button on:click={() => togglePrompt(showPrompt)} class="text-cyber-purple hover:text-neon-purple transition-colors" title="Prompt 记忆">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                </button>
                                 <button on:click={() => deleteTask(task.id, 'todo')} class="text-red-500 hover:text-red-400 transition-colors" title="删除任务">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -345,6 +413,19 @@
                                 </button>
                             </div>
                         </div>
+                        {#if expandedPrompts[showPrompt]}
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-neon-purple font-medium">Prompt 记忆</span>
+                                <button on:click={() => copyToClipboard(task.prompt_context)} class="text-xs text-cyber-blue hover:text-neon-cyan transition-colors">复制</button>
+                            </div>
+                            <textarea 
+                                bind:value={task.prompt_context}
+                                on:input={() => updatePromptContext(task.id, 'todo', task.prompt_context)}
+                                placeholder="在此粘贴你的 AI Prompt..."
+                                class="w-full bg-cyber-black border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 resize-none h-20 focus:border-neon-cyan focus:outline-none"></textarea>
+                        </div>
+                        {/if}
                     </div>
                     {/each}
                 </div>
@@ -361,6 +442,7 @@
                 </h2>
                 <div class="space-y-2">
                     {#each doingTasksArray as task (task.id)}
+                    {@const showPrompt = `prompt-${task.id}`}
                     <div class="task-card bg-cyber-gray/50 p-3 rounded border border-neon-pink/50">
                         <div class="flex items-center justify-between">
                             <div class="flex-1">
@@ -378,8 +460,26 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
                                 </button>
+                                <button on:click={() => togglePrompt(showPrompt)} class="text-cyber-purple hover:text-neon-purple transition-colors" title="Prompt 记忆">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
+                        {#if expandedPrompts[showPrompt]}
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-neon-purple font-medium">Prompt 记忆</span>
+                                <button on:click={() => copyToClipboard(task.prompt_context)} class="text-xs text-cyber-blue hover:text-neon-cyan transition-colors">复制</button>
+                            </div>
+                            <textarea 
+                                bind:value={task.prompt_context}
+                                on:input={() => updatePromptContext(task.id, 'doing', task.prompt_context)}
+                                placeholder="在此粘贴你的 AI Prompt..."
+                                class="w-full bg-cyber-black border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 resize-none h-20 focus:border-neon-cyan focus:outline-none"></textarea>
+                        </div>
+                        {/if}
                     </div>
                     {/each}
                 </div>
@@ -396,6 +496,7 @@
                 </h2>
                 <div class="space-y-2">
                     {#each doneTasksArray as task (task.id)}
+                    {@const showPrompt = `prompt-${task.id}`}
                     <div class="task-card bg-cyber-gray/30 p-3 rounded border border-gray-700 opacity-60">
                         <div class="flex items-center justify-between">
                             <div class="flex-1">
@@ -408,6 +509,11 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                     </svg>
                                 </button>
+                                <button on:click={() => togglePrompt(showPrompt)} class="text-gray-500 hover:text-neon-purple transition-colors" title="Prompt 记忆">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                </button>
                                 <button on:click={() => deleteTask(task.id, 'done')} class="text-red-500 hover:text-red-400 transition-colors" title="删除任务">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -415,6 +521,19 @@
                                 </button>
                             </div>
                         </div>
+                        {#if expandedPrompts[showPrompt]}
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-neon-purple font-medium">Prompt 记忆</span>
+                                <button on:click={() => copyToClipboard(task.prompt_context)} class="text-xs text-cyber-blue hover:text-neon-cyan transition-colors">复制</button>
+                            </div>
+                            <textarea 
+                                bind:value={task.prompt_context}
+                                on:input={() => updatePromptContext(task.id, 'done', task.prompt_context)}
+                                placeholder="在此粘贴你的 AI Prompt..."
+                                class="w-full bg-cyber-black border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 resize-none h-20 focus:border-neon-cyan focus:outline-none"></textarea>
+                        </div>
+                        {/if}
                     </div>
                     {/each}
                 </div>
@@ -508,5 +627,9 @@
   :global(.god-view-ring) {
     filter: drop-shadow(0 0 5px #9945ff);
     transition: stroke-dashoffset 0.3s ease;
+  }
+  
+  :global(.text-cyber-purple) {
+    color: #9945ff;
   }
 </style>
