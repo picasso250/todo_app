@@ -12,6 +12,7 @@
   let showAddTask = false
   let newTaskTitle = ''
   let newTaskDuration = 25
+  let taskTitleInput
 
   // 统计数据
   let todayFocusMinutes = 0
@@ -116,6 +117,11 @@
     newTaskDuration = 25
     showAddTask = false
     saveData()
+  }
+
+  // 当弹窗显示时自动聚焦到输入框
+  $: if (showAddTask && taskTitleInput) {
+    taskTitleInput.focus()
   }
 
   function startTask(task) {
@@ -393,6 +399,7 @@
         <div class="bg-cyber-dark p-6 rounded-lg border border-neon-cyan w-96">
           <h3 class="cyber-font text-lg text-neon-cyan mb-4">添加新任务</h3>
           <input
+            bind:this={taskTitleInput}
             bind:value={newTaskTitle}
             placeholder="任务名称"
             class="w-full bg-cyber-gray border border-gray-700 rounded px-3 py-2 text-gray-200 mb-3"
