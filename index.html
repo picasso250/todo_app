@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心流驾驶舱 - Flow Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cyber-black': '#0a0a0a',
+                        'cyber-dark': '#1a1a1a',
+                        'cyber-gray': '#2a2a2a',
+                        'neon-cyan': '#00ffff',
+                        'neon-pink': '#ff1493',
+                        'neon-purple': '#9945ff',
+                        'cyber-blue': '#0066ff',
+                        'cyber-green': '#00ff41'
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #00ffff',
+                        'neon-pink': '0 0 20px #ff1493, 0 0 40px #ff1493, 0 0 60px #ff1493',
+                        'neon-purple': '0 0 20px #9945ff, 0 0 40px #9945ff, 0 0 60px #9945ff'
+                    },
+                    animation: {
+                        'pulse-glow': 'pulse-glow 2s infinite',
+                        'float': 'float 3s ease-in-out infinite'
+                    },
+                    keyframes: {
+                        'pulse-glow': {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0.8' }
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+        }
+        
+        .cyber-font {
+            font-family: 'Orbitron', monospace;
+        }
+        
+        .neon-text {
+            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+        }
+        
+        .cyber-border {
+            border: 1px solid #333;
+            background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.05) 100%);
+        }
+        
+        .task-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(0,255,255,0.3);
+        }
+        
+        .countdown-glow {
+            filter: drop-shadow(0 0 30px #00ffff);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-cyber-black text-gray-100 overflow-hidden" x-data="flowDashboard()">
+    
+    <!-- 网格背景 -->
+    <div class="fixed inset-0 bg-grid-pattern opacity-20 pointer-events-none"></div>
+    
+    <!-- 主容器 -->
+    <div class="flex h-screen relative z-10">
+        
+        <!-- 左侧看板区域 -->
+        <aside class="w-96 bg-cyber-dark/90 backdrop-blur-md border-r border-cyber-gray p-6 overflow-y-auto">
+            
+            <!-- 标题 -->
+            <header class="mb-8">
+                <h1 class="cyber-font text-2xl font-bold text-neon-cyan neon-text mb-2">心流驾驶舱</h1>
+                <p class="text-gray-400 text-sm">专注当下，掌控时间</p>
+            </header>
+            
+            <!-- 添加任务按钮 -->
+            <button @click="showAddTask = true" class="w-full cyber-border p-3 rounded-lg text-neon-cyan hover:bg-neon-cyan/10 transition-all duration-300 font-medium mb-6">
+                + 添加新任务
+            </button>
+            
+            <!-- 添加任务弹窗 -->
+            <div x-show="showAddTask" x-transition class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" style="display: none;">
+                <div class="bg-cyber-dark p-6 rounded-lg border border-neon-cyan w-96">
+                    <h3 class="cyber-font text-lg text-neon-cyan mb-4">添加新任务</h3>
+                    <input x-model="newTaskTitle" placeholder="任务名称" class="w-full bg-cyber-gray border border-gray-700 rounded px-3 py-2 text-gray-200 mb-3">
+                    <input x-model="newTaskDuration" type="number" placeholder="时长（分钟）" class="w-full bg-cyber-gray border border-gray-700 rounded px-3 py-2 text-gray-200 mb-4">
+                    <div class="flex space-x-3">
+                        <button @click="addTask()" class="flex-1 bg-neon-cyan text-cyber-black px-4 py-2 rounded font-medium">添加</button>
+                        <button @click="showAddTask = false; newTaskTitle = ''; newTaskDuration = ''" class="flex-1 bg-gray-700 text-gray-200 px-4 py-2 rounded font-medium">取消</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 看板容器 -->
+            <div class="space-y-6">
+                
+                <!-- TODO 列表 -->
+                <section class="cyber-border rounded-lg p-4">
+                    <h2 class="cyber-font text-sm font-semibold text-neon-cyan mb-4 flex items-center justify-between">
+                        <span class="flex items-center">
+                            <span class="w-2 h-2 bg-neon-cyan rounded-full mr-2 animate-pulse"></span>
+                            TODO 待办
+                        </span>
+                        <span class="text-xs text-gray-500" x-text="todoTasks.length + ' 个任务'"></span>
+                    </h2>
+                    <div class="space-y-2">
+                        <template x-for="task in todoTasks" :key="task.id">
+                            <div class="task-card bg-cyber-gray/50 p-3 rounded border border-gray-700 hover:border-neon-cyan/50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <h3 class="text-sm font-medium text-gray-200" x-text="task.title"></h3>
+                                        <p class="text-xs text-gray-500 mt-1" x-text="task.duration + ' 分钟'"></p>
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        <button @click="startTask(task)" class="text-neon-cyan hover:text-neon-pink transition-colors" title="开始任务">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </button>
+                                        <button @click="deleteTask(task.id, 'todo')" class="text-red-500 hover:text-red-400 transition-colors" title="删除任务">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+                
+                <!-- DOING 列表 -->
+                <section class="cyber-border rounded-lg p-4">
+                    <h2 class="cyber-font text-sm font-semibold text-neon-pink mb-4 flex items-center justify-between">
+                        <span class="flex items-center">
+                            <span class="w-2 h-2 bg-neon-pink rounded-full mr-2 animate-pulse"></span>
+                            DOING 进行中
+                        </span>
+                        <span class="text-xs text-gray-500" x-text="doingTasks.length + ' 个任务'"></span>
+                    </h2>
+                    <div class="space-y-2">
+                        <template x-for="task in doingTasks" :key="task.id">
+                            <div class="task-card bg-cyber-gray/50 p-3 rounded border border-neon-pink/50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <h3 class="text-sm font-medium text-gray-200" x-text="task.title"></h3>
+                                        <p class="text-xs text-gray-500 mt-1" x-text="task.duration + ' 分钟'"></p>
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        <button @click="completeTask(task)" class="text-cyber-green hover:text-green-400 transition-colors" title="完成任务">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </button>
+                                        <button @click="pauseTask(task)" class="text-orange-500 hover:text-orange-400 transition-colors" title="暂停任务">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+                
+                <!-- DONE 列表 -->
+                <section class="cyber-border rounded-lg p-4">
+                    <h2 class="cyber-font text-sm font-semibold text-cyber-green mb-4 flex items-center justify-between">
+                        <span class="flex items-center">
+                            <span class="w-2 h-2 bg-cyber-green rounded-full mr-2"></span>
+                            DONE 已完成
+                        </span>
+                        <span class="text-xs text-gray-500" x-text="doneTasks.length + ' 个任务'"></span>
+                    </h2>
+                    <div class="space-y-2">
+                        <template x-for="task in doneTasks" :key="task.id">
+                            <div class="task-card bg-cyber-gray/30 p-3 rounded border border-gray-700 opacity-60">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <h3 class="text-sm font-medium text-gray-400 line-through" x-text="task.title"></h3>
+                                        <p class="text-xs text-gray-600 mt-1" x-text="'完成于 ' + task.completedAt"></p>
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        <button @click="redoTask(task)" class="text-gray-400 hover:text-neon-cyan transition-colors" title="重新开始">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                        </button>
+                                        <button @click="deleteTask(task.id, 'done')" class="text-red-500 hover:text-red-400 transition-colors" title="删除任务">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+                
+            </div>
+            
+        </aside>
+        
+        <!-- 中间倒计时区域 -->
+        <main class="flex-1 flex items-center justify-center relative">
+            
+            <!-- 倒计时显示 -->
+            <div class="text-center">
+                <div class="countdown-glow mb-8">
+                    <div class="cyber-font text-8xl font-bold text-neon-cyan neon-text" x-text="formatTime(remainingTime)">25:00</div>
+                </div>
+                
+                <div class="space-y-4">
+                    <h2 class="cyber-font text-2xl text-gray-300" x-text="currentTask ? currentTask.title : '准备开始'">准备开始</h2>
+                    
+                    <!-- 控制按钮 -->
+                    <div class="flex justify-center space-x-4">
+                        <button @click="startTimer()" :disabled="isRunning || !currentTask" 
+                                class="cyber-border px-8 py-3 rounded-lg text-neon-cyan hover:bg-neon-cyan hover:text-cyber-black transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span x-show="!isRunning">开始</span>
+                            <span x-show="isRunning">运行中</span>
+                        </button>
+                        <button @click="pauseTimer()" :disabled="!isRunning" 
+                                class="cyber-border px-8 py-3 rounded-lg text-neon-pink hover:bg-neon-pink hover:text-cyber-black transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            暂停
+                        </button>
+                        <button @click="resetTimer()" 
+                                class="cyber-border px-8 py-3 rounded-lg text-gray-400 hover:bg-gray-400 hover:text-cyber-black transition-all duration-300 font-medium">
+                            重置
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 装饰性元素 -->
+            <div class="absolute top-10 right-10 w-32 h-32 border border-neon-cyan/20 rounded-full animate-pulse"></div>
+            <div class="absolute bottom-10 left-10 w-24 h-24 border border-neon-pink/20 rounded-full animate-pulse delay-100"></div>
+            
+        </main>
+        
+    </div>
+    
+    <script>
+        function flowDashboard() {
+            return {
+                // 数据状态
+                todoTasks: [],
+                doingTasks: [],
+                doneTasks: [],
+                currentTask: null,
+                remainingTime: 25 * 60, // 默认25分钟
+                isRunning: false,
+                timer: null,
+                showAddTask: false,
+                newTaskTitle: '',
+                newTaskDuration: 25,
+                
+                // 初始化：从localStorage恢复数据
+                init() {
+                    this.loadData();
+                    // 如果有正在进行的任务，恢复计时器状态
+                    if (this.currentTask && this.currentTask.isRunning) {
+                        this.resumeTimer();
+                    }
+                },
+                
+                // 从localStorage加载数据
+                loadData() {
+                    const savedData = localStorage.getItem('flowDashboardData');
+                    if (savedData) {
+                        const data = JSON.parse(savedData);
+                        this.todoTasks = data.todoTasks || [];
+                        this.doingTasks = data.doingTasks || [];
+                        this.doneTasks = data.doneTasks || [];
+                        this.currentTask = data.currentTask || null;
+                        this.remainingTime = data.remainingTime || 25 * 60;
+                    } else {
+                        // 首次使用时的示例数据
+                        this.todoTasks = [
+                            { id: Date.now() + 1, title: '完成项目提案', duration: 25, createdAt: new Date().toLocaleString('zh-CN') },
+                            { id: Date.now() + 2, title: '代码审查', duration: 30, createdAt: new Date().toLocaleString('zh-CN') },
+                            { id: Date.now() + 3, title: '学习新技术', duration: 45, createdAt: new Date().toLocaleString('zh-CN') }
+                        ];
+                        this.saveData();
+                    }
+                },
+                
+                // 保存数据到localStorage
+                saveData() {
+                    const data = {
+                        todoTasks: this.todoTasks,
+                        doingTasks: this.doingTasks,
+                        doneTasks: this.doneTasks,
+                        currentTask: this.currentTask,
+                        remainingTime: this.remainingTime,
+                        timestamp: new Date().toISOString()
+                    };
+                    localStorage.setItem('flowDashboardData', JSON.stringify(data));
+                },
+                
+                // 添加新任务
+                addTask() {
+                    if (!this.newTaskTitle.trim()) return;
+                    
+                    const task = {
+                        id: Date.now(),
+                        title: this.newTaskTitle.trim(),
+                        duration: parseInt(this.newTaskDuration) || 25,
+                        createdAt: new Date().toLocaleString('zh-CN')
+                    };
+                    
+                    this.todoTasks.push(task);
+                    this.newTaskTitle = '';
+                    this.newTaskDuration = 25;
+                    this.showAddTask = false;
+                    this.saveData();
+                },
+                
+                // 开始任务
+                startTask(task) {
+                    // 从todo移动到doing
+                    this.todoTasks = this.todoTasks.filter(t => t.id !== task.id);
+                    this.doingTasks.push({...task, startedAt: new Date().toLocaleString('zh-CN')});
+                    
+                    // 设置为当前任务并开始计时
+                    this.currentTask = {...task};
+                    this.remainingTime = task.duration * 60;
+                    this.isRunning = true;
+                    this.startTimer();
+                    this.saveData();
+                },
+                
+                // 完成任务
+                completeTask(task) {
+                    // 从doing移动到done
+                    this.doingTasks = this.doingTasks.filter(t => t.id !== task.id);
+                    this.doneTasks.push({
+                        ...task, 
+                        completedAt: new Date().toLocaleString('zh-CN'),
+                        actualDuration: task.duration * 60 - this.remainingTime
+                    });
+                    
+                    // 重置计时器
+                    this.resetTimer();
+                    this.saveData();
+                    
+                    // 播放完成提示（可选）
+                    this.playCompleteSound();
+                },
+                
+                // 暂停任务
+                pauseTask(task) {
+                    this.pauseTimer();
+                    this.saveData();
+                },
+                
+                // 重新开始已完成任务
+                redoTask(task) {
+                    const newTask = {
+                        id: Date.now(),
+                        title: task.title,
+                        duration: task.duration,
+                        createdAt: new Date().toLocaleString('zh-CN')
+                    };
+                    
+                    this.doneTasks = this.doneTasks.filter(t => t.id !== task.id);
+                    this.todoTasks.push(newTask);
+                    this.saveData();
+                },
+                
+                // 删除任务
+                deleteTask(taskId, type) {
+                    if (type === 'todo') {
+                        this.todoTasks = this.todoTasks.filter(t => t.id !== taskId);
+                    } else if (type === 'doing') {
+                        this.doingTasks = this.doingTasks.filter(t => t.id !== taskId);
+                        if (this.currentTask && this.currentTask.id === taskId) {
+                            this.resetTimer();
+                        }
+                    } else if (type === 'done') {
+                        this.doneTasks = this.doneTasks.filter(t => t.id !== taskId);
+                    }
+                    this.saveData();
+                },
+                
+                // 开始计时器
+                startTimer() {
+                    if (!this.currentTask) return;
+                    
+                    this.isRunning = true;
+                    this.timer = setInterval(() => {
+                        if (this.remainingTime > 0) {
+                            this.remainingTime--;
+                            this.saveData();
+                        } else {
+                            // 时间到，自动完成任务
+                            if (this.currentTask) {
+                                const task = this.doingTasks.find(t => t.id === this.currentTask.id);
+                                if (task) {
+                                    this.completeTask(task);
+                                }
+                            }
+                        }
+                    }, 1000);
+                },
+                
+                // 暂停计时器
+                pauseTimer() {
+                    this.isRunning = false;
+                    if (this.timer) {
+                        clearInterval(this.timer);
+                        this.timer = null;
+                    }
+                    this.saveData();
+                },
+                
+                // 重置计时器
+                resetTimer() {
+                    this.pauseTimer();
+                    this.currentTask = null;
+                    this.remainingTime = 25 * 60;
+                    this.saveData();
+                },
+                
+                // 恢复计时器（页面刷新时）
+                resumeTimer() {
+                    if (this.currentTask && !this.timer) {
+                        this.startTimer();
+                    }
+                },
+                
+                // 格式化时间显示
+                formatTime(seconds) {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                },
+                
+                // 播放完成提示音（使用Web Audio API）
+                playCompleteSound() {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                },
+                
+                // 页面卸载时清理
+                beforeUnload() {
+                    if (this.timer) {
+                        clearInterval(this.timer);
+                    }
+                }
+            }
+        }
+        
+        // 页面卸载时清理定时器
+        window.addEventListener('beforeunload', () => {
+            if (window.flowDashboard && window.flowDashboard.timer) {
+                clearInterval(window.flowDashboard.timer);
+            }
+        });
+    </script>
+    
+</body>
+</html>
