@@ -59,3 +59,14 @@
 
 5.  **自动化 (Automate)**：
     *   这就是你正在做的——试图配置 OpenCode 让它自动遵守规则。
+
+---
+
+如果我在大的改动之后忘记，那么你提醒我
+"Review logic. Remove redundant code. Simplify state management. Can we make xxx under 400 lines without splitting files?"
+Removing whitespace and compressing CSS is NOT simplification. It makes the code unmaintainable.
+    Rule: Readability > Line Count.
+    Do not delete comments or necessary spacing.
+
+---
+
