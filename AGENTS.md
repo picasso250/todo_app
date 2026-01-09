@@ -1,39 +1,14 @@
 # PROJECT CONSTITUTION & PHILOSOPHY
 
 ## 1. Zero Over-Engineering (零过度设计)
-- **Rule**: Always choose the simplest possible implementation.
-- **Prohibition**: Do NOT use meta-frameworks (Next.js, Nuxt, SvelteKit, Remix) unless explicitly requested.
-- **Default**: Use Vite + [Library] (SPA mode) for all frontend tasks.
-- **Philosophy**: We prefer "Worse is Better" simplicity over "Correct" complexity.
 
 ## 2. Atomic Changes (原子化变更)
-- **Rule**: Never refactor the entire architecture in one step.
-- **Process**: 
-  1. Plan the change.
-  2. Modify ONE component or file.
-  3. Verify it works.
-  4. Move to the next.
-- If a user asks for a rewrite, break it down into 3+ steps internally before executing.
 
 ## 3. Stability First (稳定性优先)
-- **Rule**: Existing features must NOT break when adding new ones (Regression Testing).
-- **Check**: Before finalizing any code, ask yourself: "Did I break the build? Did I break the 'Add Task' button?"
 
 ## 4. Tech Stack Constraints (技术栈约束)
-- **Allowed**: HTML, CSS (Tailwind), JS (ES6+), Svelte (Vite), LocalStorage.
-- **Banned**: TypeScript (unless asked), SSR (Server Side Rendering), Docker (unless asked), Complex State Management (Redux/Pinia) - use simple Stores.
 
 ## 5. Verification Process (验证流程)
-- **Problem**: `npm run dev` is a blocking server process. Do NOT use it for checking errors.
-- **Rule**: When you want to verify if your code works/compiles:
-  - Use `npm run build` (or `npx vite build`).
-  - OR use `npx svelte-check` (if available).
-- **Process**:
-  1. Edit code.
-  2. Run `npm run build` to catch syntax/build errors.
-  3. If it fails, read the log and fix.
-  4. If it passes, assume the code is valid.
-- **Exception**: Only run `npm run dev` if the user explicitly asks "Start the server" as the FINAL step.
 
 ---
 
@@ -64,9 +39,11 @@
 
 如果我在大的改动之后忘记，那么你提醒我
 "Review logic. Remove redundant code. Simplify state management. Refactor to reduce Cognitive Load"
-Removing whitespace and compressing CSS is NOT simplification. It makes the code unmaintainable.
     Rule: Readability > Line Count.
-    Do not delete comments or necessary spacing.
+
+---
+
+小步快跑
 
 ---
 

@@ -1,12 +1,13 @@
 <script>
   import { onMount } from 'svelte'
   import TaskCard from './components/TaskCard.svelte'
+  import Timer from './components/Timer.svelte'
+  import StatsPanel from './components/StatsPanel.svelte'
 
   // 状态管理 - 使用普通变量
   let todoTasks = []
-  let doingTasks = []
+  let activeTask = null  // 替代 doingTasks 数组，只能有一个活跃任务
   let doneTasks = []
-  let currentTask = null
   let remainingTime = 25 * 60
   let isRunning = false
   let showAddTask = false
@@ -19,7 +20,7 @@
   let todayFocusPercentage = 0
   const dailyTarget = 240
 
-  let timer = null
+
   let expandedPrompts = {}
   let promptUpdateTimers = {}
 
@@ -34,24 +35,27 @@
       ...task,
       prompt_context: task.prompt_context || '',
     }))
-    doingTasks = (data.doingTasks || []).map((task) => ({
-      ...task,
-      prompt_context: task.prompt_context || '',
-    }))
+    // doingTasks 已移除，改为 activeTask 架构
     doneTasks = (data.doneTasks || []).map((task) => ({
       ...task,
       prompt_context: task.prompt_context || '',
     }))
-    currentTask = data.currentTask
+    activeTask = data.currentTask
       ? { ...data.currentTask, prompt_context: data.currentTask.prompt_context || '' }
       : null
     remainingTime = data.remainingTime || 25 * 60
 
-    if (data.isRunning && currentTask && data.startTime) {
+    if (data.isRunning && activeTask && data.startTime) {
       const elapsedSeconds = Math.floor((Date.now() - data.startTime) / 1000)
-      remainingTime = Math.max(0, currentTask.duration * 60 - elapsedSeconds)
+      remainingTime = Math.max(0, activeTask.duration * 60 - elapsedSeconds)
       isRunning = true
-      setTimeout(() => startTimer(), 100)
+      // 延迟启动计时器，等待DOM渲染完成
+      setTimeout(() => {
+        const timerElement = document.querySelector('timer-component')
+        if (timerElement) {
+          timerElement.start()
+        }
+      }, 100)
     } else {
       isRunning = false
     }
@@ -90,12 +94,12 @@
       'flowDashboardData',
       JSON.stringify({
         todoTasks,
-        doingTasks,
+        doingTasks: [],  // 保持向后兼容，但数组为空
         doneTasks,
-        currentTask,
+        currentTask: activeTask,
         remainingTime,
         isRunning,
-        startTime: isRunning && currentTask ? Date.now() : null,
+        startTime: isRunning && activeTask ? Date.now() : null,
       }),
     )
     calculateTodayFocus()
@@ -125,43 +129,75 @@
   }
 
   function startTask(task) {
-    if (isRunning && currentTask) {
-      pauseTimer()
-      doingTasks = doingTasks.filter((t) => t.id !== currentTask.id)
-      todoTasks = [...todoTasks, { ...currentTask, startedAt: undefined }]
+    // 如果已有活跃任务，先将其移回待办
+    if (activeTask) {
+      // 通知计时器组件暂停
+      const timerElement = document.querySelector('timer-component')
+      if (timerElement) {
+        timerElement.pause()
+      }
+      
+      todoTasks = [...todoTasks, { ...activeTask, startedAt: undefined }]
     }
 
+    // 从待办中移除任务，设为活跃任务
     todoTasks = todoTasks.filter((t) => t.id !== task.id)
-    doingTasks = [...doingTasks, { ...task, startedAt: new Date().toLocaleString('zh-CN') }]
+    activeTask = { ...task, startedAt: new Date().toLocaleString('zh-CN') }
 
-    currentTask = { ...task }
     remainingTime = task.duration * 60
     isRunning = true
-    startTimer()
+    
+    // 通知计时器组件开始
+    const timerStart = document.querySelector('timer-component')
+    if (timerStart) {
+      setTimeout(() => timerStart.start(), 100)
+    }
+    
     saveData()
   }
 
   function completeTask(task) {
-    doingTasks = doingTasks.filter((t) => t.id !== task.id)
-    doneTasks = [
-      ...doneTasks,
-      {
-        ...task,
-        completedAt: new Date().toLocaleString('zh-CN'),
-        actualDuration: task.duration * 60 - remainingTime,
-      },
-    ]
-
-    resetTimer()
+    // 活跃任务完成后移到已完成列表
+    if (activeTask && activeTask.id === task.id) {
+      doneTasks = [
+        ...doneTasks,
+        {
+          ...task,
+          completedAt: new Date().toLocaleString('zh-CN'),
+          actualDuration: task.duration * 60 - remainingTime,
+        },
+      ]
+      
+      activeTask = null
+      
+      // 通知计时器组件播放完成音效并重置
+      const timerElement = document.querySelector('timer-component')
+      if (timerElement) {
+        timerElement.reset()
+      }
+    }
+    
     saveData()
-    playCompleteSound()
   }
 
   function pauseTask(task) {
-    pauseTimer()
-    doingTasks = doingTasks.filter((t) => t.id !== task.id)
-    todoTasks = [...todoTasks, task]
-    resetTimer()
+    // 只有活跃任务可以被暂停/停止
+    if (activeTask && activeTask.id === task.id) {
+      // 将活跃任务移回待办列表
+      todoTasks = [...todoTasks, task]
+      activeTask = null
+      
+      // 重置计时器状态
+      isRunning = false
+      remainingTime = 25 * 60
+      
+      // 通知计时器组件重置
+      const timerElement = document.querySelector('timer-component')
+      if (timerElement) {
+        timerElement.reset()
+      }
+    }
+    
     saveData()
   }
 
@@ -182,10 +218,14 @@
   function deleteTask(taskId, type) {
     if (type === 'todo') {
       todoTasks = todoTasks.filter((t) => t.id !== taskId)
-    } else if (type === 'doing') {
-      doingTasks = doingTasks.filter((t) => t.id !== taskId)
-      if (currentTask && currentTask.id === taskId) {
-        resetTimer()
+    } else if (type === 'active') {
+      if (activeTask && activeTask.id === taskId) {
+        activeTask = null
+        // 重置计时器
+        const timerReset = document.querySelector('timer-component')
+        if (timerReset) {
+          timerReset.reset()
+        }
       }
     } else if (type === 'done') {
       doneTasks = doneTasks.filter((t) => t.id !== taskId)
@@ -193,58 +233,27 @@
     saveData()
   }
 
-  function startTimer() {
-    if (!currentTask) return
-
-    isRunning = true
-    timer = setInterval(() => {
-      if (remainingTime > 0) {
-        remainingTime--
-        if (remainingTime % 60 === 0) {
-          calculateTodayFocus()
-        }
-        saveData()
-      } else {
-        const task = doingTasks.find((t) => t.id === currentTask.id)
-        if (task) completeTask(task)
-      }
-    }, 1000)
-  }
-
-  function pauseTimer() {
-    isRunning = false
-    if (timer) {
-      clearInterval(timer)
-      timer = null
-    }
+  function handleTimerTick(event) {
+    const { remainingTime: newRemainingTime, isRunning: newIsRunning } = event.detail
+    remainingTime = newRemainingTime
+    isRunning = newIsRunning
     saveData()
   }
 
-  function resetTimer() {
-    pauseTimer()
+  function handleTimerComplete() {
+    if (activeTask) completeTask(activeTask)
+  }
+
+  function handleTimerReset(event) {
+    const { remainingTime: newRemainingTime } = event.detail
+    remainingTime = newRemainingTime
     currentTask = null
-    remainingTime = 25 * 60
     saveData()
   }
 
-  function formatTime(seconds) {
-    return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60)
-      .toString()
-      .padStart(2, '0')}`
-  }
-
-  function playCompleteSound() {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-    const oscillator = audioContext.createOscillator()
-    const gainNode = audioContext.createGain()
-    oscillator.connect(gainNode)
-    gainNode.connect(audioContext.destination)
-    oscillator.frequency.value = 800
-    oscillator.type = 'sine'
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
-    oscillator.start(audioContext.currentTime)
-    oscillator.stop(audioContext.currentTime + 0.5)
+  function handleUpdateStats() {
+    calculateTodayFocus()
+    saveData()
   }
 
   function updatePromptContext(taskId, type, promptContext) {
@@ -257,12 +266,10 @@
         tasks.map((t) => (t.id === taskId ? { ...t, prompt_context: promptContext } : t))
 
       if (type === 'todo') todoTasks = updateList(todoTasks)
-      else if (type === 'doing') doingTasks = updateList(doingTasks)
-      else if (type === 'done') doneTasks = updateList(doneTasks)
-
-      if (currentTask && currentTask.id === taskId) {
-        currentTask = { ...currentTask, prompt_context: promptContext }
+      else if (type === 'active') {
+        activeTask = { ...activeTask, prompt_context: promptContext }
       }
+      else if (type === 'done') doneTasks = updateList(doneTasks)
 
       saveData()
       delete promptUpdateTimers[taskId]
@@ -294,8 +301,8 @@
       }
     })
 
-    if (currentTask && isRunning) {
-      totalMinutes += Math.round((currentTask.duration * 60 - remainingTime) / 60)
+    if (activeTask && isRunning) {
+      totalMinutes += Math.round((activeTask.duration * 60 - remainingTime) / 60)
     }
 
     todayFocusMinutes = totalMinutes
@@ -339,39 +346,12 @@
 <!-- 网格背景 -->
 <div class="fixed inset-0 bg-grid-pattern opacity-20 pointer-events-none"></div>
 
-<!-- 上帝视角统计面板 -->
-<div class="fixed top-4 right-4 z-50 god-view-panel rounded-lg p-4 min-w-[200px]">
-  <h3 class="cyber-font text-sm font-semibold text-neon-purple mb-3 god-view-stat">
-    今日专注
-  </h3>
-  <div class="flex items-center justify-center mb-3">
-    <svg width="120" height="120" class="transform -rotate-90">
-      <circle cx="60" cy="60" r="50" stroke="#2a2a2a" stroke-width="8" fill="none" />
-      <circle
-        cx="60"
-        cy="60"
-        r="50"
-        stroke="#9945ff"
-        stroke-width="8"
-        fill="none"
-        stroke-dasharray="314.16"
-        stroke-dashoffset={314.16 - (314.16 * todayFocusPercentage) / 100}
-        class="god-view-ring"
-        stroke-linecap="round"
-      />
-    </svg>
-    <div class="absolute text-center">
-      <div class="cyber-font text-xl text-neon-purple god-view-stat">
-        {todayFocusMinutes}min
-      </div>
-      <div class="text-xs text-gray-500">专注时长</div>
-    </div>
-  </div>
-  <div class="text-xs text-gray-400 text-center">
-    效率指数:
-    <span class="text-neon-cyan font-semibold god-view-stat">{todayFocusPercentage}%</span>
-  </div>
-</div>
+<!-- 统计面板 -->
+<StatsPanel 
+  {todayFocusMinutes} 
+  {todayFocusPercentage} 
+  dailyTarget={dailyTarget} 
+/>
 
 <!-- 主容器 -->
 <div class="flex h-screen relative z-10">
@@ -456,7 +436,7 @@
         <div class="space-y-2">
           {#each todoTasks as task (task.id)}
             <TaskCard 
-              {task} 
+              task={task} 
               type="todo" 
               isExpanded={expandedPrompts[`prompt-${task.id}`]}
               on:action={handleTaskAction}
@@ -467,28 +447,7 @@
         </div>
       </section>
 
-      <!-- DOING 列表 -->
-      <section class="cyber-border rounded-lg p-4">
-        <h2 class="cyber-font text-sm font-semibold text-neon-pink mb-4 flex items-center justify-between">
-          <span class="flex items-center">
-            <span class="w-2 h-2 bg-neon-pink rounded-full mr-2 animate-pulse"></span>
-            DOING 进行中
-          </span>
-          <span class="text-xs text-gray-500">{doingTasks.length} 个任务</span>
-        </h2>
-        <div class="space-y-2">
-          {#each doingTasks as task (task.id)}
-            <TaskCard 
-              {task} 
-              type="doing" 
-              isExpanded={expandedPrompts[`prompt-${task.id}`]}
-              on:action={handleTaskAction}
-              on:update={handleTaskUpdate}
-              on:toggle-prompt={handleTogglePrompt}
-            />
-          {/each}
-        </div>
-      </section>
+
 
       <!-- DONE 列表 -->
       <section class="cyber-border rounded-lg p-4">
@@ -502,7 +461,7 @@
         <div class="space-y-2">
           {#each doneTasks as task (task.id)}
             <TaskCard 
-              {task} 
+              task={task} 
               type="done" 
               isExpanded={expandedPrompts[`prompt-${task.id}`]}
               on:action={handleTaskAction}
@@ -515,43 +474,21 @@
     </div>
   </aside>
 
-  <!-- 中间倒计时区域 -->
+  <!-- 中心舞台 - 计时器和任务操作 -->
   <main class="flex-1 flex items-center justify-center relative">
-    <!-- 倒计时显示 -->
-    <div class="text-center">
-      <div class="countdown-glow mb-8">
-        <div class="cyber-font text-8xl font-bold text-neon-cyan neon-text">
-          {formatTime(remainingTime)}
-        </div>
-      </div>
-
-      <div class="space-y-4">
-        <h2 class="cyber-font text-2xl text-gray-300">
-          {currentTask ? currentTask.title : '准备开始'}
-        </h2>
-
-        <!-- 控制按钮 -->
-        <div class="flex justify-center space-x-4">
-          <button
-            on:click={() => (isRunning ? pauseTimer() : startTimer())}
-            disabled={!currentTask}
-            class="cyber-border px-8 py-3 rounded-lg text-neon-cyan hover:bg-neon-cyan hover:text-cyber-black transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {#if !currentTask}准备开始{:else if isRunning}暂停{:else}继续{/if}
-          </button>
-          <button
-            on:click={resetTimer}
-            class="cyber-border px-8 py-3 rounded-lg text-gray-400 hover:bg-gray-400 hover:text-cyber-black transition-all duration-300 font-medium"
-          >
-            重置
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 装饰性元素 -->
-    <div class="absolute top-10 right-10 w-32 h-32 border border-neon-cyan/20 rounded-full animate-pulse"></div>
-    <div class="absolute bottom-10 left-10 w-24 h-24 border border-neon-pink/20 rounded-full animate-pulse delay-100"></div>
+    <Timer 
+      bind:currentTask={activeTask} 
+      bind:isRunning 
+      bind:remainingTime
+      on:tick={handleTimerTick}
+      on:complete={handleTimerComplete}
+      on:reset={handleTimerReset}
+      on:updateStats={handleUpdateStats}
+      on:taskAction={handleTaskAction}
+      on:updatePrompt={handleTaskUpdate}
+      on:togglePrompt={handleTogglePrompt}
+      expandedPrompts={expandedPrompts}
+    />
   </main>
 </div>
 
@@ -575,28 +512,9 @@
     background-size: 50px 50px;
   }
 
-  :global(.countdown-glow) {
-    text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #00ffff, 0 0 80px #00ffff;
-  }
 
 
 
-  :global(.god-view-panel) {
-    background: rgba(26, 26, 26, 0.95);
-    border: 1px solid #9945ff;
-    box-shadow: 0 0 20px rgba(153, 69, 255, 0.3);
-  }
 
-  :global(.god-view-stat) {
-    text-shadow: 0 0 10px currentColor;
-  }
 
-  :global(.god-view-ring) {
-    filter: drop-shadow(0 0 5px #9945ff);
-    transition: stroke-dashoffset 0.3s ease;
-  }
-
-  :global(.text-cyber-purple) {
-    color: #9945ff;
-  }
 </style>

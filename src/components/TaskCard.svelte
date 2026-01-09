@@ -4,6 +4,7 @@
   export let task
   export let type = 'todo'
   export let isExpanded = false
+  export let heroMode = false
 
   const dispatch = createEventDispatcher()
 
@@ -49,7 +50,7 @@
         },
       ]
 
-    if (type === 'doing')
+    if (type === 'active')
       return [
         {
           icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>',
@@ -99,7 +100,7 @@
 
   function getBorderColor() {
     if (type === 'todo') return 'border-gray-700 hover:border-neon-cyan/50'
-    if (type === 'doing') return 'border-neon-pink/50'
+    if (type === 'active') return 'border-neon-pink/50'
     return 'border-gray-700'
   }
 
@@ -114,12 +115,14 @@
   }
 </script>
 
-<div class="task-card {getBackgroundOpacity()} p-3 rounded border {getBorderColor()}">
+<div class="task-card {getBackgroundOpacity()} p-3 rounded border {getBorderColor()}" class:hero-mode={heroMode}>
   <div class="flex items-center justify-between">
     <div class="flex-1">
       <h3 class="text-sm font-medium {getTextClass()}">{task.title}</h3>
       <p class="text-xs text-gray-500 mt-1">
-        {type === 'done' ? `完成于 ${task.completedAt}` : `${task.duration} 分钟`}
+        {type === 'done' ? `完成于 ${task.completedAt}` : 
+         type === 'active' ? `进行中 - ${task.duration} 分钟` : 
+         `${task.duration} 分钟`}
       </p>
     </div>
     <div class="flex space-x-2">
@@ -165,5 +168,13 @@
 <style>
   :global(.task-card) {
     transition: all 0.3s ease;
+  }
+
+  :global(.hero-mode) {
+    transform: scale(1.2);
+    background: rgba(26, 26, 26, 0.95);
+    border: 2px solid #ff1493;
+    box-shadow: 0 0 20px rgba(255, 20, 147, 0.5);
+    max-width: 400px;
   }
 </style>
