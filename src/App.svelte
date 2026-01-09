@@ -3,6 +3,7 @@
   import TaskCard from './components/TaskCard.svelte'
   import Timer from './components/Timer.svelte'
   import StatsPanel from './components/StatsPanel.svelte'
+  import PromptModal from './components/PromptModal.svelte'
 
   // 状态管理 - 使用普通变量
   let todoTasks = []
@@ -20,8 +21,9 @@
   let todayFocusPercentage = 0
   const dailyTarget = 240
 
-
-  let expandedPrompts = {}
+  // Prompt Modal 状态
+  let isPromptModalOpen = false
+  let currentPromptTask = null
   let promptUpdateTimers = {}
 
   onMount(() => {
@@ -276,9 +278,41 @@
     }, 300)
   }
 
-  function togglePrompt(promptId) {
-    expandedPrompts[promptId] = !expandedPrompts[promptId]
-    expandedPrompts = { ...expandedPrompts }
+  function togglePrompt(event) {
+    const { task } = event.detail
+    currentPromptTask = task
+    isPromptModalOpen = true
+  }
+
+  function handlePromptSave(event) {
+    const { taskId, promptContext } = event.detail
+    
+    if (promptUpdateTimers[taskId]) {
+      clearTimeout(promptUpdateTimers[taskId])
+    }
+
+    promptUpdateTimers[taskId] = setTimeout(() => {
+      // 更新各个列表中的任务
+      todoTasks = todoTasks.map(t => 
+        t.id === taskId ? { ...t, prompt_context: promptContext } : t
+      )
+      
+      if (activeTask && activeTask.id === taskId) {
+        activeTask = { ...activeTask, prompt_context: promptContext }
+      }
+      
+      doneTasks = doneTasks.map(t => 
+        t.id === taskId ? { ...t, prompt_context: promptContext } : t
+      )
+      
+      saveData()
+      delete promptUpdateTimers[taskId]
+    }, 300)
+  }
+
+  function handlePromptClose() {
+    isPromptModalOpen = false
+    currentPromptTask = null
   }
 
   async function copyToClipboard(text) {
@@ -330,15 +364,7 @@
     }
   }
 
-  function handleTaskUpdate(event) {
-    const { taskId, type, promptContext } = event.detail
-    updatePromptContext(taskId, type, promptContext)
-  }
 
-  function handleTogglePrompt(event) {
-    const { taskId } = event.detail
-    togglePrompt(`prompt-${taskId}`)
-  }
 
 
 </script>
@@ -437,11 +463,9 @@
           {#each todoTasks as task (task.id)}
             <TaskCard 
               task={task} 
-              type="todo" 
-              isExpanded={expandedPrompts[`prompt-${task.id}`]}
+              type="todo"
               on:action={handleTaskAction}
-              on:update={handleTaskUpdate}
-              on:toggle-prompt={handleTogglePrompt}
+              on:toggle-prompt={togglePrompt}
             />
           {/each}
         </div>
@@ -462,11 +486,9 @@
           {#each doneTasks as task (task.id)}
             <TaskCard 
               task={task} 
-              type="done" 
-              isExpanded={expandedPrompts[`prompt-${task.id}`]}
+              type="done"
               on:action={handleTaskAction}
-              on:update={handleTaskUpdate}
-              on:toggle-prompt={handleTogglePrompt}
+              on:toggle-prompt={togglePrompt}
             />
           {/each}
         </div>
@@ -485,12 +507,18 @@
       on:reset={handleTimerReset}
       on:updateStats={handleUpdateStats}
       on:taskAction={handleTaskAction}
-      on:updatePrompt={handleTaskUpdate}
-      on:togglePrompt={handleTogglePrompt}
-      expandedPrompts={expandedPrompts}
+      on:togglePrompt={togglePrompt}
     />
   </main>
 </div>
+
+<!-- Prompt Modal -->
+<PromptModal 
+  bind:isOpen={isPromptModalOpen}
+  bind:task={currentPromptTask}
+  on:save={handlePromptSave}
+  on:close={handlePromptClose}
+/>
 
 <style>
   :global(.cyber-font) {
@@ -511,10 +539,5 @@
       linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
     background-size: 50px 50px;
   }
-
-
-
-
-
 
 </style>

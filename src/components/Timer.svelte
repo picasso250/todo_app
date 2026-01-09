@@ -4,7 +4,6 @@
   export let currentTask = null
   export let isRunning = false
   export let remainingTime = 25 * 60
-  export let expandedPrompts = {}
 
   let timer = null
   let timerElement
@@ -12,18 +11,8 @@
   // 向父组件发送事件
   const dispatch = createEventDispatcher()
 
-  function updatePromptContext(promptContext) {
-    dispatch('updatePrompt', { taskId: currentTask.id, type: 'active', promptContext })
-  }
-
   function togglePrompt() {
-    dispatch('togglePrompt', { taskId: currentTask.id })
-  }
-
-  function copyToClipboard() {
-    navigator.clipboard.writeText(currentTask.prompt_context).catch(err => {
-      console.error('复制失败:', err)
-    })
+    dispatch('togglePrompt', { taskId: currentTask.id, task: currentTask })
   }
 
   function handleTaskAction(action) {
@@ -121,19 +110,7 @@
     pauseTimer()
   }
 
-  // 立即更新prompt上下文
-  function promptUpdateImmediate(promptContext) {
-    if (promptUpdateTimers[currentTask.id]) {
-      clearTimeout(promptUpdateTimers[currentTask.id])
-    }
-    
-    promptUpdateTimers[currentTask.id] = setTimeout(() => {
-      updatePromptContext(promptContext)
-      delete promptUpdateTimers[currentTask.id]
-    }, 300)
-  }
 
-  let promptUpdateTimers = {}
 </script>
 
 <!-- 倒计时显示 -->
@@ -182,26 +159,7 @@
         </button>
       </div>
 
-      <!-- Prompt 记忆展开区域 -->
-      {#if expandedPrompts[`prompt-${currentTask.id}`]}
-        <div class="pt-4 border-t border-gray-700">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs text-neon-purple font-medium">Prompt 记忆</span>
-            <button
-              on:click={copyToClipboard}
-              class="text-xs text-cyber-blue hover:text-neon-cyan transition-colors"
-            >
-              复制
-            </button>
-          </div>
-          <textarea
-            bind:value={currentTask.prompt_context}
-            on:input={() => promptUpdateImmediate(currentTask.prompt_context)}
-            placeholder="在此粘贴你的 AI Prompt..."
-            class="w-full bg-cyber-black border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 resize-none h-24 focus:border-neon-cyan focus:outline-none"
-          ></textarea>
-        </div>
-      {/if}
+
     </div>
   {:else}
     <div class="space-y-4">

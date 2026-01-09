@@ -3,23 +3,12 @@
 
   export let task
   export let type = 'todo'
-  export let isExpanded = false
   export let heroMode = false
 
   const dispatch = createEventDispatcher()
 
-  function updatePromptContext(promptContext) {
-    dispatch('update', { taskId: task.id, type, promptContext })
-  }
-
   function togglePrompt() {
-    dispatch('toggle-prompt', { taskId: task.id })
-  }
-
-  function copyToClipboard() {
-    navigator.clipboard.writeText(task.prompt_context).catch(err => {
-      console.error('复制失败:', err)
-    })
+    dispatch('toggle-prompt', { taskId: task.id, task })
   }
 
   function taskActions() {
@@ -144,25 +133,7 @@
       {/each}
     </div>
   </div>
-  {#if isExpanded}
-    <div class="mt-3 pt-3 border-t border-gray-700">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-xs text-neon-purple font-medium">Prompt 记忆</span>
-        <button
-          on:click={copyToClipboard}
-          class="text-xs text-cyber-blue hover:text-neon-cyan transition-colors"
-        >
-          复制
-        </button>
-      </div>
-      <textarea
-        bind:value={task.prompt_context}
-        on:input={() => updatePromptContext(task.prompt_context)}
-        placeholder="在此粘贴你的 AI Prompt..."
-        class="w-full bg-cyber-black border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 resize-none h-20 focus:border-neon-cyan focus:outline-none"
-      ></textarea>
-    </div>
-  {/if}
+
 </div>
 
 <style>
