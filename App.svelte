@@ -20,6 +20,7 @@
   
   let timer = null
   let expandedPrompts = {}
+  let promptUpdateTimers = {}
   
   // 订阅响应式变量
   $: todoTasksArray = $todoTasks
@@ -36,9 +37,6 @@
   
   onMount(() => {
     loadData()
-    if ($currentTask && $currentTask.isRunning) {
-      resumeTimer()
-    }
   })
   
   // 从localStorage加载数据
@@ -69,7 +67,23 @@
         currentTask.set(null)
       }
       
-      remainingTime.set(data.remainingTime || 25 * 60)
+       remainingTime.set(data.remainingTime || 25 * 60)
+       
+       // 恢复运行状态
+       if (data.isRunning && data.currentTask && data.startTime) {
+         const elapsedSeconds = Math.floor((Date.now() - data.startTime) / 1000)
+         const correctRemainingTime = Math.max(0, data.currentTask.duration * 60 - elapsedSeconds)
+         remainingTime.set(correctRemainingTime)
+         isRunning.set(true)
+         // 延迟启动计时器，确保状态设置完成
+         setTimeout(() => {
+           if ($currentTask && $isRunning) {
+             startTimer()
+           }
+         }, 100)
+       } else {
+         isRunning.set(false)
+       }
     } else {
       // 首次使用时的示例数据
       todoTasks.set([
@@ -82,19 +96,21 @@
     calculateTodayFocus()
   }
   
-  // 保存数据到localStorage
-  function saveData() {
-    const data = {
-      todoTasks: $todoTasks,
-      doingTasks: $doingTasks,
-      doneTasks: $doneTasks,
-      currentTask: $currentTask,
-      remainingTime: $remainingTime,
-      timestamp: new Date().toISOString()
-    }
-    localStorage.setItem('flowDashboardData', JSON.stringify(data))
-    calculateTodayFocus()
-  }
+   // 保存数据到localStorage
+   function saveData() {
+     const data = {
+       todoTasks: $todoTasks,
+       doingTasks: $doingTasks,
+       doneTasks: $doneTasks,
+       currentTask: $currentTask,
+       remainingTime: $remainingTime,
+       isRunning: $isRunning,
+       startTime: $isRunning && $currentTask ? Date.now() : null,
+       timestamp: new Date().toISOString()
+     }
+     localStorage.setItem('flowDashboardData', JSON.stringify(data))
+     calculateTodayFocus()
+   }
   
   // 添加新任务
   function addTask() {
@@ -117,6 +133,18 @@
   
   // 开始任务
   function startTask(task) {
+    // 如果已有运行中的任务，先停止它
+    if ($isRunning && $currentTask) {
+      pauseTimer()
+      // 将当前任务放回 TODO
+      doingTasks.update(tasks => tasks.filter(t => t.id !== $currentTask.id))
+      todoTasks.update(tasks => [...tasks, {
+        ...$currentTask,
+        startedAt: undefined // 移除开始时间
+      }])
+    }
+    
+    // 移动新任务到 DOING
     todoTasks.update(tasks => tasks.filter(t => t.id !== task.id))
     doingTasks.update(tasks => [...tasks, {...task, startedAt: new Date().toLocaleString('zh-CN')}])
     
@@ -144,6 +172,10 @@
   // 暂停任务
   function pauseTask(task) {
     pauseTimer()
+    // 将暂停的任务从 DOING 移回 TODO
+    doingTasks.update(tasks => tasks.filter(t => t.id !== task.id))
+    todoTasks.update(tasks => [...tasks, task])
+    resetTimer()
     saveData()
   }
   
@@ -253,28 +285,37 @@
     oscillator.stop(audioContext.currentTime + 0.5)
   }
   
-  // 更新任务的 prompt_context
+  // 更新任务的 prompt_context (带防抖)
   function updatePromptContext(taskId, type, promptContext) {
-    if (type === 'todo') {
-      todoTasks.update(tasks => tasks.map(t => 
-        t.id === taskId ? { ...t, prompt_context: promptContext } : t
-      ))
-    } else if (type === 'doing') {
-      doingTasks.update(tasks => tasks.map(t => 
-        t.id === taskId ? { ...t, prompt_context: promptContext } : t
-      ))
-    } else if (type === 'done') {
-      doneTasks.update(tasks => tasks.map(t => 
-        t.id === taskId ? { ...t, prompt_context: promptContext } : t
-      ))
+    // 清除之前的定时器
+    if (promptUpdateTimers[taskId]) {
+      clearTimeout(promptUpdateTimers[taskId])
     }
     
-    // 如果是当前任务，也要更新 currentTask
-    if ($currentTask && $currentTask.id === taskId) {
-      currentTask.update(task => ({ ...task, prompt_context: promptContext }))
-    }
-    
-    saveData()
+    // 设置新的防抖定时器
+    promptUpdateTimers[taskId] = setTimeout(() => {
+      if (type === 'todo') {
+        todoTasks.update(tasks => tasks.map(t => 
+          t.id === taskId ? { ...t, prompt_context: promptContext } : t
+        ))
+      } else if (type === 'doing') {
+        doingTasks.update(tasks => tasks.map(t => 
+          t.id === taskId ? { ...t, prompt_context: promptContext } : t
+        ))
+      } else if (type === 'done') {
+        doneTasks.update(tasks => tasks.map(t => 
+          t.id === taskId ? { ...t, prompt_context: promptContext } : t
+        ))
+      }
+      
+      // 如果是当前任务，也要更新 currentTask
+      if ($currentTask && $currentTask.id === taskId) {
+        currentTask.update(task => ({ ...task, prompt_context: promptContext }))
+      }
+      
+      saveData()
+      delete promptUpdateTimers[taskId]
+    }, 300) // 300ms 防抖延迟
   }
   
   // 切换 Prompt 显示/隐藏
@@ -455,9 +496,10 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
                                 </button>
-                                <button on:click={() => pauseTask(task)} class="text-orange-500 hover:text-orange-400 transition-colors" title="暂停任务">
+                                <button on:click={() => pauseTask(task)} class="text-orange-500 hover:text-orange-400 transition-colors" title="停止任务">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
                                     </svg>
                                 </button>
                                 <button on:click={() => togglePrompt(showPrompt)} class="text-cyber-purple hover:text-neon-purple transition-colors" title="Prompt 记忆">
@@ -555,15 +597,11 @@
             <div class="space-y-4">
                 <h2 class="cyber-font text-2xl text-gray-300">{currentTaskValue ? currentTaskValue.title : '准备开始'}</h2>
                 
-                <!-- 控制按钮 -->
+                 <!-- 控制按钮 -->
                 <div class="flex justify-center space-x-4">
-                    <button on:click={startTimer} disabled={isRunningValue || !currentTaskValue} 
+                    <button on:click={() => isRunningValue ? pauseTimer() : startTimer()} disabled={!currentTaskValue} 
                             class="cyber-border px-8 py-3 rounded-lg text-neon-cyan hover:bg-neon-cyan hover:text-cyber-black transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                        {#if isRunningValue}运行中{:else}开始{/if}
-                    </button>
-                    <button on:click={pauseTimer} disabled={!isRunningValue} 
-                            class="cyber-border px-8 py-3 rounded-lg text-neon-pink hover:bg-neon-pink hover:text-cyber-black transition-all duration-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                        暂停
+                        {#if !currentTaskValue}准备开始{:else if isRunningValue}暂停{:else}继续{/if}
                     </button>
                     <button on:click={resetTimer} 
                             class="cyber-border px-8 py-3 rounded-lg text-gray-400 hover:bg-gray-400 hover:text-cyber-black transition-all duration-300 font-medium">
